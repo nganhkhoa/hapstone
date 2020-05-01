@@ -20,7 +20,7 @@ critical or greater versatility is needed. This means that the abstractions
 introduced in the C version of the library are still present, but their use has
 been restricted to provide more reasonable levels of safety.
 -}
-module Hapstone.Internal.Capstone 
+module Hapstone.Internal.Capstone
     ( -- * Datatypes
       Csh
     , CsArch(..)
@@ -169,11 +169,15 @@ data ArchInfo
     = X86 X86.CsX86 -- ^ x86 architecture
     | Arm64 Arm64.CsArm64 -- ^ ARM64 architecture
     | Arm Arm.CsArm -- ^ ARM architecture
+    -- | M68k M68k.CsM68k -- ^ M68K architecture
     | Mips Mips.CsMips -- ^ MIPS architecture
     | Ppc Ppc.CsPpc -- ^ PPC architecture
     | Sparc Sparc.CsSparc -- ^ SPARC architecture
     | SysZ SystemZ.CsSysZ -- ^ SystemZ architecture
     | XCore XCore.CsXCore -- ^ XCore architecture
+    -- | Tms320c64x Tms320c64x.CsTms320c64x -- ^ TMS320C64x architecture
+    -- | M680x M680x.CsM680x -- ^ M680X architecture
+    -- | Evm Evm.CsEvm -- ^ Ethereum architecture
     deriving (Show, Eq)
 
 -- | instruction information
@@ -223,11 +227,15 @@ instance Storable CsDetail where
           Just (X86 x) -> poke bP x
           Just (Arm64 x) -> poke bP x
           Just (Arm x) -> poke bP x
+          -- Just (M68k x) -> poke bP x
           Just (Mips x) -> poke bP x
           Just (Ppc x) -> poke bP x
           Just (Sparc x) -> poke bP x
           Just (SysZ x) -> poke bP x
           Just (XCore x) -> poke bP x
+          -- Just (Tms320c64x x) -> poke bP x
+          -- Just (M680x x) -> poke bP x
+          -- Just (Evm x) -> poke bP x
           Nothing -> return ()
 
 -- | an arch-sensitive peek for cs_detail
@@ -244,6 +252,11 @@ peekDetail arch p = do
             CsArchSparc -> Sparc <$> peek bP
             CsArchSysz -> SysZ <$> peek bP
             CsArchXcore -> XCore <$> peek bP
+            -- CsArchM68k -> M68k <$> peek bP
+            -- CsArchTms320C64x -> Tms320c64x <$> peek bP
+            -- CsArchM680x -> M680x <$> peek bP
+            -- CsArchEvm -> Evm <$> peek bP
+            -- CsArchMax -> Max <$> peek bP
     return detail { archInfo = Just aI }
 
 -- | instructions
@@ -297,7 +310,7 @@ instance Storable CsInsn where
                          poke csDetailPtr d'
                          {#set cs_insn->detail#} p (castPtr csDetailPtr)
 
--- | an arch-sensitive peek for cs_insn 
+-- | an arch-sensitive peek for cs_insn
 peekArch :: CsArch -> Ptr CsInsn -> IO CsInsn
 peekArch arch p = do
     insn <- peek p
