@@ -33,14 +33,17 @@ import Hapstone.Internal.Util
 {#enum m680x_reg as M680xReg {underscoreToCase}
     deriving (Show, Eq, Bounded)#}
 
+{#enum m680x_op_type as M680xOpType {underscoreToCase}
+    deriving (Show, Eq, Bounded)#}
+
 data M680xOpIdx = M680xOpIdx
     { baseReg :: M680xReg
     , offsetReg :: M680xReg
-    , offset :: Int16
+    , idxOffset :: Int16
     , offsetAddr :: Int16
     , offsetBits :: Word8
     , incDec :: Int8
-    , flags :: Word8
+    , idxFlags :: Word8
     } deriving (Show, Eq)
 
 instance Storable M680xOpIdx where
@@ -64,8 +67,8 @@ instance Storable M680xOpIdx where
         {#set m680x_op_idx->flags#} p (fromIntegral f)
 
 data M680xOpRel = M680xOpRel
-    { address :: Word16
-    , offset :: Int16
+    { relAddress :: Word16
+    , relOffset :: Int16
     } deriving (Show, Eq)
 
 instance Storable M680xOpRel where
@@ -79,7 +82,7 @@ instance Storable M680xOpRel where
         {#set m680x_op_rel->offset#} p (fromIntegral o)
 
 data M680xOpExt = M680xOpExt
-    { address :: Word16
+    { extAddress :: Word16
     , indirect :: Bool
     } deriving (Show, Eq)
 
@@ -88,10 +91,10 @@ instance Storable M680xOpExt where
     alignment _ = {#alignof m680x_op_ext#}
     peek p = M680xOpExt
         <$> (fromIntegral <$> {#get m680x_op_ext->address#} p)
-        <*> (fromIntegral <$> {#get m680x_op_ext->indirect#} p)
+        <*> ({#get m680x_op_ext->indirect#} p)
     poke p (M680xOpExt a i) = do
         {#set m680x_op_ext->address#} p (fromIntegral a)
-        {#set m680x_op_ext->indirect#} p (fromIntegral o)
+        {#set m680x_op_ext->indirect#} p i
 
 data CsM680xOpValue
     = Imm Int32
@@ -143,7 +146,7 @@ instance Storable CsM680xOp where
             setType = {#set cs_m680x_op->type#} p . fromIntegral . fromEnum
         case v of
             Imm i -> do
-              poke immP (fromIntegral r :: CUInt)
+              poke immP (fromIntegral i :: CUInt)
               setType M680xOpImmediate
             Reg r -> do
               poke regP (fromIntegral $ fromEnum r :: CUInt)
@@ -158,11 +161,11 @@ instance Storable CsM680xOp where
               poke extP e
               setType M680xOpExtended
             Addr a -> do
-              poke addrP (fromIntegral r :: CUInt)
+              poke addrP (fromIntegral a :: CUInt)
               setType M680xOpDirect
             Val v -> do
-              poke valP (fromIntegral r :: CUInt)
-              setType M680xConstant
+              poke valP (fromIntegral a :: CUInt)
+              setType M680xOpConstant
             _ -> setType M680xOpInvalid
 
 
@@ -186,8 +189,5 @@ instance Storable CsM680x where
            else pokeArray (plusPtr p {#offsetof cs_m680x->operands#}) o
 
 -- | M680X instructions
-{#enum m608x_insn as M680xInsn {underscoreToCase}
-    deriving (Show, Eq, Bounded)#}
--- | M680X instruction groups
-{#enum cs_m680x_group as CsM680xGroup {underscoreToCase}
+{#enum m680x_insn as M680xInsn {underscoreToCase}
     deriving (Show, Eq, Bounded)#}

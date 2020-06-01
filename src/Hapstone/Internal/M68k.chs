@@ -39,13 +39,13 @@ import Hapstone.Internal.Util
 {#enum m68k_op_type as M68kOpType {underscoreToCase}
     deriving (Show, Eq, Bounded)#}
 
-data M68kOpMem = M68kOpMem
+data M68kOpMemStruct = M68kOpMemStruct
     { baseReg :: M68kReg
     , indexReg :: M68kReg
     , inBaseReg :: M68kReg
     , inDisp :: Word32
     , outDisp :: Word32
-    , disp :: Int16
+    , memDisp :: Int16
     , scale :: Word8
     , bitfield :: Word8
     , width :: Word8
@@ -53,52 +53,52 @@ data M68kOpMem = M68kOpMem
     , indexSize :: Word8
     } deriving (Show, Eq)
 
-instance Storable M68kOpMem where
+instance Storable M68kOpMemStruct where
     sizeOf _ = {#sizeof m68k_op_mem#}
     alignment _ = {#alignof m68k_op_mem#}
-    peek p = M68kOpMem
-        <$> ((toEnum . fromIntegral) <$> {#get m68k_op_mem->baseReg#} p)
-        <*> ((toEnum . fromIntegral) <$> {#get m68k_op_mem->indexReg#} p)
-        <*> ((toEnum . fromIntegral) <$> {#get m68k_op_mem->inBaseReg#} p)
-        <*> (fromIntegral <$> {#get m68k_op_mem->inDisp#} p)
-        <*> (fromIntegral <$> {#get m68k_op_mem->outDisp#} p)
+    peek p = M68kOpMemStruct
+        <$> ((toEnum . fromIntegral) <$> {#get m68k_op_mem->base_reg#} p)
+        <*> ((toEnum . fromIntegral) <$> {#get m68k_op_mem->index_reg#} p)
+        <*> ((toEnum . fromIntegral) <$> {#get m68k_op_mem->in_base_reg#} p)
+        <*> (fromIntegral <$> {#get m68k_op_mem->in_disp#} p)
+        <*> (fromIntegral <$> {#get m68k_op_mem->out_disp#} p)
         <*> (fromIntegral <$> {#get m68k_op_mem->disp#} p)
         <*> (fromIntegral <$> {#get m68k_op_mem->scale#} p)
         <*> (fromIntegral <$> {#get m68k_op_mem->bitfield#} p)
         <*> (fromIntegral <$> {#get m68k_op_mem->width#} p)
         <*> (fromIntegral <$> {#get m68k_op_mem->offset#} p)
-        <*> (fromIntegral <$> {#get m68k_op_mem->indexSize#} p)
-    poke p (M68kOpMem bR iR iBR iD oD d s b w o iS) = do
-        {#set m68k_op_mem->baseReg#} p (fromIntegral $ fromEnum bR)
-        {#set m68k_op_mem->indexReg#} p (fromIntegral $ fromEnum iR)
-        {#set m68k_op_mem->inBaseReg#} p (fromIntegral $ fromEnum iBR)
-        {#set m68k_op_mem->inDisp#} p (fromIntegral iD)
-        {#set m68k_op_mem->outDisp#} p (fromIntegral oD)
+        <*> (fromIntegral <$> {#get m68k_op_mem->index_size#} p)
+    poke p (M68kOpMemStruct bR iR iBR iD oD d s b w o iS) = do
+        {#set m68k_op_mem->base_reg#} p (fromIntegral $ fromEnum bR)
+        {#set m68k_op_mem->index_reg#} p (fromIntegral $ fromEnum iR)
+        {#set m68k_op_mem->in_base_reg#} p (fromIntegral $ fromEnum iBR)
+        {#set m68k_op_mem->in_disp#} p (fromIntegral iD)
+        {#set m68k_op_mem->out_disp#} p (fromIntegral oD)
         {#set m68k_op_mem->disp#} p (fromIntegral d)
         {#set m68k_op_mem->scale#} p (fromIntegral s)
         {#set m68k_op_mem->bitfield#} p (fromIntegral b)
         {#set m68k_op_mem->width#} p (fromIntegral w)
         {#set m68k_op_mem->offset#} p (fromIntegral o)
-        {#set m68k_op_mem->indexSize#} p (fromIntegral iS)
+        {#set m68k_op_mem->index_size#} p (fromIntegral iS)
 
 
 {#enum m68k_op_br_disp_size as M68kOpBrDispSize {underscoreToCase}
     deriving (Show, Eq, Bounded)#}
 
-data M68kOpBrDisp = M68kOpBrDisp
-    { disp :: Int32
-    , size :: M68kOpBrDispSize
+data M68kOpBrDispStruct = M68kOpBrDispStruct
+    { brDisp :: Int32
+    , brSize :: M68kOpBrDispSize
     } deriving (Show, Eq)
 
-instance Storable M68kOpBrDisp where
+instance Storable M68kOpBrDispStruct where
     sizeOf _ = {#sizeof m68k_op_br_disp#}
     alignment _ = {#alignof m68k_op_br_disp#}
-    peek p = M68kOpBrDisp
+    peek p = M68kOpBrDispStruct
         <$> (fromIntegral <$> {#get m68k_op_br_disp->disp#} p)
-        <*> ((toEnum . fromIntegral) <$> {#get m68k_op_br_disp->size#} p)
-    poke p (M68kOpBrDisp d s) = do
+        <*> ((toEnum . fromIntegral) <$> {#get m68k_op_br_disp->disp_size#} p)
+    poke p (M68kOpBrDispStruct d s) = do
         {#set m68k_op_br_disp->disp#} p (fromIntegral d)
-        {#set m68k_op_br_disp->size#} p (fromIntegral $ fromEnum s)
+        {#set m68k_op_br_disp->disp_size#} p (fromIntegral $ fromEnum s)
 
 
 data CsM68kOpValue
@@ -107,14 +107,14 @@ data CsM68kOpValue
     | SImm Float
     | Reg M68kReg
     | RegPair (M68kReg, M68kReg)
-    | Undefined
+    | CsM68kOpInvalid
     deriving (Show, Eq)
 
 data CsM68kOp = CsM68kOp
-    { mem :: M68kOpMem
-    , brDisp :: M68kOpBrDisp
+    { value :: CsM68kOpValue
+    , mem :: M68kOpMemStruct
+    , br :: M68kOpBrDispStruct
     , registerBits :: Word32
-    , value :: CsM68kOpValue
     , addressMode :: M68kAddressMode
     } deriving (Show, Eq)
 
@@ -125,33 +125,35 @@ instance Storable CsM68kOp where
         <$> do
             t <- fromIntegral <$> {#get cs_m68k_op->type#} p
             let regP = plusPtr p {#offsetof cs_m68k_op->reg#}
-            let reg0P = plusPtr p {#offsetof cs_m68k_op->reg_0#}
-            let reg1P = plusPtr p {#offsetof cs_m68k_op->reg_1#}
+            let reg0P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_0#}
+            let reg1P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_1#}
             case toEnum t of
-                M68kOpImm -> (Imm. toEnum . fromIntegral) <$> {#get cs_m68k_op->imm#} p
-                M68kOpFpDouble -> (Reg . toEnum . fromIntegral) <$> {#get cs_m68k_op->dimm#} p
-                M68kOpFpSingle -> (Reg . toEnum . fromIntegral) <$> {#get cs_m68k_op->simm#} p
-                M68OpReg -> Reg <$> (peek regP)
-                M68OpRegPair -> (,)
-                    <$> (Reg <$> (peek reg0P))
-                    <*> (Reg <$> (peek reg1P))
+                M68kOpImm -> (Imm . fromIntegral) <$> {#get cs_m68k_op->imm#} p
+                M68kOpFpDouble -> (DImm . realToFrac) <$> {#get cs_m68k_op->dimm#} p
+                M68kOpFpSingle -> (SImm . realToFrac) <$> {#get cs_m68k_op->simm#} p
+                M68kOpReg -> (Reg . toEnum . fromIntegral) <$> {#get cs_m68k_op->reg#} p
+                M68kOpRegPair -> do
+                    let r0 = (toEnum . fromIntegral) <$> {#get cs_m68k_op->reg_pair.reg_0#} p
+                    let r1 = (toEnum . fromIntegral) <$> {#get cs_m68k_op->reg_pair.reg_1#} p
+                    RegPair <$> ((,) <$> r0 <*> r1)
+                _ -> return CsM68kOpInvalid
+        <*> peek (plusPtr p {#offsetof cs_m68k_op->mem#})
         <*> peek (plusPtr p {#offsetof cs_m68k_op->br_disp#})
-        <*> (fromIntegral <$> {#get cs_m68k_op->registerBits#} p)
-        <*> ((toEnum . fromIntegral) <$> {#get cs_m64k_op->value#} p)
-        <*> ((toEnum . fromIntegral) <$> {#get cs_m64k_op->addressMode#} p)
-    poke p (CsM68kOp m b r v a) = do
+        <*> (fromIntegral <$> {#get cs_m68k_op->register_bits#} p)
+        <*> ((toEnum . fromIntegral) <$> {#get cs_m68k_op->address_mode#} p)
+    poke p (CsM68kOp v m b r a) = do
+        poke (plusPtr p {#offsetof cs_m68k_op->mem#}) m
         poke (plusPtr p {#offsetof cs_m68k_op->br_disp#}) b
-        {#set cs_m68k_op->value#} p (fromIntegral $ fromEnum v)
-        {#set cs_m68k_op->addressMode#} p (fromIntegral $ fromEnum a)
-        {#set cs_m68k_op->registerBits#} p (fromIntegral r)
+        {#set cs_m68k_op->address_mode#} p (fromIntegral $ fromEnum a)
+        {#set cs_m68k_op->register_bits#} p (fromIntegral r)
         let regP = plusPtr p {#offsetof cs_m68k_op->reg#}
             immP = plusPtr p {#offsetof cs_m68k_op->imm#}
             dimmP = plusPtr p {#offsetof cs_m68k_op->dimm#}
             simmP = plusPtr p {#offsetof cs_m68k_op->simm#}
-            reg0P = plusPtr p {#offsetof cs_m68k_op->reg_0#}
-            reg1P = plusPtr p {#offsetof cs_m68k_op->reg_1#}
+            reg0P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_0#}
+            reg1P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_1#}
             setType = {#set cs_m68k_op->type#} p . fromIntegral . fromEnum
-        case m of
+        case v of
           Reg r -> do
               poke regP (fromIntegral $ fromEnum r :: CUInt)
               setType M68kOpReg
@@ -159,10 +161,10 @@ instance Storable CsM68kOp where
               poke immP (fromIntegral i :: Int64)
               setType M68kOpImm
           DImm i -> do
-              poke dimmP (fromIntegral i :: Int64)
+              poke dimmP (realToFrac i :: CDouble)
               setType M68kOpFpDouble
           SImm i -> do
-              poke simmP (fromIntegral i :: Int64)
+              poke simmP (realToFrac i :: CFloat)
               setType M68kOpFpSingle
           RegPair (r0, r1) -> do
               poke reg0P (fromIntegral $ fromEnum r0 :: CUInt)
@@ -192,12 +194,12 @@ instance Storable M68kOpSize where
         t <- fromIntegral <$> {#get m68k_op_size->type#} p
         case toEnum t of
             M68kSizeTypeCpu -> (CpuSize . toEnum . fromIntegral) <$> {#get m68k_op_size->cpu_size#} p
-            M68KSizeTypeFpu -> (FpuSize . toEnum . fromIntegral) <$> {#get m68k_op_size->fpu_size#} p
-            _ -> M68kOpSizeInvalid
+            M68kSizeTypeFpu -> (FpuSize . toEnum . fromIntegral) <$> {#get m68k_op_size->fpu_size#} p
+            _ -> return M68kOpSizeInvalid
     poke p opSize = do
-        let cpuP = plusPtr p {#offsetof m68_op_size->cpu_size#}
-            fpuP = plusPtr p {#offsetof m68_op_size->fpu_size#}
-            setType = {#set m68_op_size->type#} p . fromIntegral . fromEnum
+        let cpuP = plusPtr p {#offsetof m68k_op_size->cpu_size#}
+            fpuP = plusPtr p {#offsetof m68k_op_size->fpu_size#}
+            setType = {#set m68k_op_size->type#} p . fromIntegral . fromEnum
         case opSize of
             CpuSize c -> do
                 poke cpuP (fromIntegral $ fromEnum c :: CUInt)
@@ -205,7 +207,7 @@ instance Storable M68kOpSize where
             FpuSize f -> do
                 poke fpuP (fromIntegral $ fromEnum f :: CUInt)
                 setType M68kSizeTypeFpu
-            _ -> setType M68kSizeInvalid
+            _ -> setType M68kSizeTypeInvalid
 
 
 data CsM68k = CsM68k
@@ -222,7 +224,7 @@ instance Storable CsM68k where
                peekArray num ptr
         <*> peek (plusPtr p {#offsetof cs_m68k->op_size#})
     poke p (CsM68k o s) = do
-        poke (plusPtr p {#offsetof cs_m68k-op_size>#}) s
+        poke (plusPtr p {#offsetof cs_m68k->op_size#}) s
         {#set cs_m68k->op_count#} p (fromIntegral $ length o)
         if length o > 4
            then error "operands overflew 4 elements"

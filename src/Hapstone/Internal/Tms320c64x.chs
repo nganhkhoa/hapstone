@@ -42,31 +42,31 @@ import Hapstone.Internal.Util
 {#enum tms320c64x_mem_mod as Tms320c64xMemMod {underscoreToCase}
     deriving (Show, Eq, Bounded)#}
 
-data Tms320c64xOpMem = Tms320c64xOpMem
+data Tms320c64xOpMemStruct = Tms320c64xOpMemStruct
     { base :: Word32
     , disp :: Word32
-    , uint :: Word32
+    , unit :: Word32
     , scaled :: Word32
     , disptype :: Word32
     , direction :: Word32
     , modify :: Word32
     } deriving (Show, Eq)
 
-instance Storable Tms320c64xOpMem where
+instance Storable Tms320c64xOpMemStruct where
     sizeOf _ = {#sizeof tms320c64x_op_mem#}
     alignment _ = {#alignof tms320c64x_op_mem#}
-    peek p = Tms320c64xOpMem
+    peek p = Tms320c64xOpMemStruct
         <$> (fromIntegral <$> {#get tms320c64x_op_mem->base#} p)
         <*> (fromIntegral <$> {#get tms320c64x_op_mem->disp#} p)
-        <*> (fromIntegral <$> {#get tms320c64x_op_mem->uint#} p)
+        <*> (fromIntegral <$> {#get tms320c64x_op_mem->unit#} p)
         <*> (fromIntegral <$> {#get tms320c64x_op_mem->scaled#} p)
         <*> (fromIntegral <$> {#get tms320c64x_op_mem->disptype#} p)
         <*> (fromIntegral <$> {#get tms320c64x_op_mem->direction#} p)
         <*> (fromIntegral <$> {#get tms320c64x_op_mem->modify#} p)
-    poke p (Tms320c64xOpMem b d u s dt dr m) = do
+    poke p (Tms320c64xOpMemStruct b d u s dt dr m) = do
         {#set tms320c64x_op_mem->base#} p (fromIntegral b)
         {#set tms320c64x_op_mem->disp#} p (fromIntegral d)
-        {#set tms320c64x_op_mem->uint#} p (fromIntegral u)
+        {#set tms320c64x_op_mem->unit#} p (fromIntegral u)
         {#set tms320c64x_op_mem->scaled#} p (fromIntegral s)
         {#set tms320c64x_op_mem->disptype#} p (fromIntegral dt)
         {#set tms320c64x_op_mem->direction#} p (fromIntegral dr)
@@ -76,7 +76,7 @@ data CsTms320c64xOpValue
     = Imm Int32
     | Reg Word32
     | RegPair Word32
-    | Mem Tms320c64xOpMem
+    | Mem Tms320c64xOpMemStruct
     | CsTms320c64xOpInvalid
     deriving (Show, Eq)
 
@@ -102,7 +102,7 @@ instance Storable CsTms320c64xOp where
             immP = plusPtr p {#offsetof cs_tms320c64x_op->imm#}
             memP = plusPtr p {#offsetof cs_tms320c64x_op->mem#}
             setType = {#set cs_tms320c64x_op->type#} p . fromIntegral . fromEnum
-        case op of
+        case v of
           Reg r -> do
               poke regP (fromIntegral r :: CUInt)
               setType Tms320c64xOpReg
@@ -131,21 +131,21 @@ instance Storable CsTms320c64x where
         <$> do num <- fromIntegral <$> {#get cs_tms320c64x->op_count#} p
                let ptr = plusPtr p {#offsetof cs_tms320c64x->operands#}
                peekArray num ptr
-        <*> (,)
-            <$> fromIntegral <$> {#get cs_tms320c64x->condition.reg#} p
-            <*> fromIntegral <$> {#get cs_tms320c64x->condition.zero#} p
-        <*> (,,)
-            <$> fromIntegral <$> {#get cs_tms320c64x->funit.unit#} p
-            <*> fromIntegral <$> {#get cs_tms320c64x->funit.side#} p
-            <*> fromIntegral <$> {#get cs_tms320c64x->funit.crosspath#} p
-        <*> fromIntegral <$> {#get cs_tms320c64x->parallel#} p
-    poke p (CsTms320c64x o (r, z) (u, s, c) p) = do
+        <*> ((,)
+            <$> (fromIntegral <$> {#get cs_tms320c64x->condition.reg#} p)
+            <*> (fromIntegral <$> {#get cs_tms320c64x->condition.zero#} p))
+        <*> ((,,)
+            <$> (fromIntegral <$> {#get cs_tms320c64x->funit.unit#} p)
+            <*> (fromIntegral <$> {#get cs_tms320c64x->funit.side#} p)
+            <*> (fromIntegral <$> {#get cs_tms320c64x->funit.crosspath#} p))
+        <*> (fromIntegral <$> {#get cs_tms320c64x->parallel#} p)
+    poke p (CsTms320c64x o (r, z) (u, s, c) pr) = do
         {#set cs_tms320c64x->condition.reg#} p (fromIntegral r)
         {#set cs_tms320c64x->condition.zero#} p (fromIntegral z)
         {#set cs_tms320c64x->funit.unit#} p (fromIntegral u)
         {#set cs_tms320c64x->funit.side#} p (fromIntegral s)
         {#set cs_tms320c64x->funit.crosspath#} p (fromIntegral c)
-        {#set cs_tms320c64x->parallel#} p (fromIntegral p)
+        {#set cs_tms320c64x->parallel#} p (fromIntegral pr)
         {#set cs_tms320c64x->op_count#} p (fromIntegral $ length o)
         if length o > 8
            then error "operands overflew 8 elements"
@@ -157,7 +157,7 @@ instance Storable CsTms320c64x where
 {#enum tms320c64x_insn as Tms320c64xInsn {underscoreToCase}
     deriving (Show, Eq, Bounded)#}
 
-{#enum tms320c64x_group_type as Tms320c64xGroupType {underscoreToCase}
+{#enum tms320c64x_insn_group as Tms320c64xInsnGroup {underscoreToCase}
     deriving (Show, Eq, Bounded)#}
 
 {#enum tms320c64x_funit as Tms320c64xFunit {underscoreToCase}

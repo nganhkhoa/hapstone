@@ -88,6 +88,10 @@ import qualified Hapstone.Internal.Sparc as Sparc
 import qualified Hapstone.Internal.SystemZ as SystemZ
 import qualified Hapstone.Internal.X86 as X86
 import qualified Hapstone.Internal.XCore as XCore
+import qualified Hapstone.Internal.M68k as M68k
+import qualified Hapstone.Internal.Tms320c64x as Tms320c64x
+import qualified Hapstone.Internal.Evm as Evm
+import qualified Hapstone.Internal.M680x as M680x
 
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -169,15 +173,15 @@ data ArchInfo
     = X86 X86.CsX86 -- ^ x86 architecture
     | Arm64 Arm64.CsArm64 -- ^ ARM64 architecture
     | Arm Arm.CsArm -- ^ ARM architecture
-    -- | M68k M68k.CsM68k -- ^ M68K architecture
+    | M68k M68k.CsM68k -- ^ M68K architecture
     | Mips Mips.CsMips -- ^ MIPS architecture
     | Ppc Ppc.CsPpc -- ^ PPC architecture
     | Sparc Sparc.CsSparc -- ^ SPARC architecture
     | SysZ SystemZ.CsSysZ -- ^ SystemZ architecture
     | XCore XCore.CsXCore -- ^ XCore architecture
-    -- | Tms320c64x Tms320c64x.CsTms320c64x -- ^ TMS320C64x architecture
-    -- | M680x M680x.CsM680x -- ^ M680X architecture
-    -- | Evm Evm.CsEvm -- ^ Ethereum architecture
+    | Tms320c64x Tms320c64x.CsTms320c64x -- ^ TMS320C64x architecture
+    | M680x M680x.CsM680x -- ^ M680X architecture
+    | Evm Evm.CsEvm -- ^ Ethereum architecture
     deriving (Show, Eq)
 
 -- | instruction information
@@ -227,15 +231,15 @@ instance Storable CsDetail where
           Just (X86 x) -> poke bP x
           Just (Arm64 x) -> poke bP x
           Just (Arm x) -> poke bP x
-          -- Just (M68k x) -> poke bP x
+          Just (M68k x) -> poke bP x
           Just (Mips x) -> poke bP x
           Just (Ppc x) -> poke bP x
           Just (Sparc x) -> poke bP x
           Just (SysZ x) -> poke bP x
           Just (XCore x) -> poke bP x
-          -- Just (Tms320c64x x) -> poke bP x
-          -- Just (M680x x) -> poke bP x
-          -- Just (Evm x) -> poke bP x
+          Just (Tms320c64x x) -> poke bP x
+          Just (M680x x) -> poke bP x
+          Just (Evm x) -> poke bP x
           Nothing -> return ()
 
 -- | an arch-sensitive peek for cs_detail
@@ -252,11 +256,10 @@ peekDetail arch p = do
             CsArchSparc -> Sparc <$> peek bP
             CsArchSysz -> SysZ <$> peek bP
             CsArchXcore -> XCore <$> peek bP
-            -- CsArchM68k -> M68k <$> peek bP
-            -- CsArchTms320C64x -> Tms320c64x <$> peek bP
-            -- CsArchM680x -> M680x <$> peek bP
-            -- CsArchEvm -> Evm <$> peek bP
-            -- CsArchMax -> Max <$> peek bP
+            CsArchM68k -> M68k <$> peek bP
+            CsArchTms320c64x -> Tms320c64x <$> peek bP
+            CsArchM680x -> M680x <$> peek bP
+            CsArchEvm -> Evm <$> peek bP
     return detail { archInfo = Just aI }
 
 -- | instructions
