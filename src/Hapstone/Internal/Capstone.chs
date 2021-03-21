@@ -246,7 +246,7 @@ instance Storable CsDetail where
 peekDetail :: CsArch -> Ptr CsDetail -> IO CsDetail
 peekDetail arch p = do
     detail <- peek p
-    let bP = plusPtr p 48
+    let bP = plusPtr p {#offsetof cs_detail->x86#}
     aI <- case arch of
             CsArchX86 -> X86 <$> peek bP
             CsArchArm64 -> Arm64 <$> peek bP
