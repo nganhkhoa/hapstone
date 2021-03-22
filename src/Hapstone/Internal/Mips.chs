@@ -61,8 +61,8 @@ data CsMipsOp
     deriving (Show, Eq)
 
 instance Storable CsMipsOp where
-    sizeOf _ = {#sizeof mips_op_mem#}
-    alignment _ = {#alignof mips_op_mem#}
+    sizeOf _ = {#sizeof cs_mips_op#}
+    alignment _ = {#alignof cs_mips_op#}
     peek p = do
         t <- fromIntegral <$> {#get cs_mips_op->type#} p
         let memP = plusPtr p {#offsetof cs_mips_op->mem#}
