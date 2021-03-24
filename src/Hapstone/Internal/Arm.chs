@@ -135,7 +135,7 @@ instance Storable CsArmOp where
               ArmOpMem -> Mem <$> (peek memP)
               ArmOpSetend -> (Setend . toEnum . fromIntegral) <$> {#get cs_arm_op->setend#} p
               _ -> return Undefined
-        <*> ({#get cs_arm_op->subtracted#} p)
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_arm_op->subtracted#} :: IO Word8))
         <*> (fromIntegral <$> {#get cs_arm_op->access#} p)
         <*> (fromIntegral <$> {#get cs_arm_op->neon_lane#} p)
     poke p (CsArmOp vI (sh, shV) val sub acc neon) = do
@@ -208,8 +208,8 @@ instance Storable CsArm where
         <*> ((toEnum . fromIntegral) <$> {#get cs_arm->cps_mode#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_arm->cps_flag#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_arm->cc#} p)
-        <*> ({#get cs_arm->update_flags#} p)
-        <*> ({#get cs_arm->writeback#} p)
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_arm->update_flags#} :: IO Word8))
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_arm->writeback#} :: IO Word8))
         <*> ((toEnum . fromIntegral) <$> {#get cs_arm->mem_barrier#} p)
         <*> do num <- fromIntegral <$> {#get cs_arm->op_count#} p
                let ptr = plusPtr p {#offsetof cs_arm->operands#}

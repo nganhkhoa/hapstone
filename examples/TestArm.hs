@@ -6,6 +6,7 @@ import           Numeric                        ( showHex )
 
 import           Hapstone.Capstone
 import           Hapstone.Internal.Capstone    as Capstone
+import           Hapstone.Internal.Arm         as Arm
 
 arm_code =
   [ 0x86 , 0x48 , 0x60 , 0xf4 , 0xED , 0xFF , 0xFF , 0xEB
@@ -44,11 +45,144 @@ armv8 =
   ]
 
 print_insn_detail :: Capstone.Csh -> Capstone.CsInsn -> IO ()
-print_insn_detail handle insn = putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+print_insn_detail handle insn = do
+  putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+  case Capstone.detail insn of
+    Just detail -> do
+      case archInfo detail of
+        Just (Arm arch) -> do
+          printArchInsnInfo arch
+        _ -> pure()
+    _ -> pure ()
+  putStrLn ""
  where
   m = mnemonic insn
   o = opStr insn
   a = (showHex $ address insn) ""
+
+  printArchInsnInfo arch = do
+    if length operands > 0
+       then putStrLn ("\topcount: " ++ ((show . length) operands))
+       else pure ()
+    mapM_ printOperandDetail $ zip [0..] operands
+    if updateFlags arch
+       then putStrLn "\tUpdate-flags: True"
+       else pure ()
+    if writeback arch
+       then putStrLn "\tWrite-back: True"
+       else pure ()
+    case cc arch of
+      ArmCcAl -> pure ()
+      ArmCcInvalid -> pure ()
+      _ -> putStrLn (printf "\tCode condition: %s" (show $ cc arch))
+    case cpsMode arch of
+      ArmCpsmodeInvalid -> pure ()
+      _ ->
+        putStrLn (printf "\tCPSI-mode: %s" (show $ cpsMode arch))
+    case cpsFlag arch of
+      ArmCpsflagInvalid -> pure ()
+      _ ->
+        putStrLn (printf "\tCPSI-flag: %s" (show $ cpsFlag arch))
+    case vectorData arch of
+      ArmVectordataInvalid -> pure ()
+      _ -> putStrLn (printf "\tVector-data: %s" (show $ vectorData arch))
+    if vectorSize arch /= 0
+       then putStrLn (printf "\tVector-size: %u" (vectorSize arch))
+       else pure ()
+    if usermode arch
+       then putStrLn (printf "\tUser-mode: True")
+       else pure ()
+    case memBarrier arch of
+      ArmMbInvalid -> pure ()
+      _ -> putStrLn (printf "\tMem-barrier: %s" (show $ memBarrier arch))
+
+    -- TODO: read/writer register, wait cs_reg_access
+      where
+        operands = Arm.operands arch
+
+  printOperandDetail :: (Int, Arm.CsArmOp) -> IO ()
+  printOperandDetail (i, op) = do
+    case value op of
+      Reg reg ->
+        let Just reg_name = Capstone.csRegName handle reg in
+          putStrLn (printf "\t\toperands[%u].type: REG = %s" i reg_name)
+      Sysreg reg ->
+        putStrLn (printf "\t\toperands[%u].type: SYSREG = %u" i reg)
+      Imm imm ->
+        putStrLn (printf "\t\toperands[%u].type: IMM = 0x%x" i imm)
+      CImm imm ->
+        putStrLn (printf "\t\toperands[%u].type: C-IMM = %u" i imm)
+      PImm imm ->
+        putStrLn (printf "\t\toperands[%u].type: P-IMM = %u" i imm)
+      Fp fp ->
+        putStrLn (printf "\t\toperands[%u].type: FP = %f" i fp)
+      Setend setend ->
+        case setend of
+          ArmSetendBe ->
+            putStrLn (printf "\t\toperands[%u].type: SETEND = be" i)
+          ArmSetendLe ->
+            putStrLn (printf "\t\toperands[%u].type: SETEND = le" i)
+      Mem mem -> do
+        let base_ = base mem
+            index_ = index mem
+            scale_ = scale mem
+            disp_ = disp mem
+            lshift_ = lshift mem
+        putStrLn (printf "\t\toperands[%u].type: MEM" i)
+        if base_ /= ArmRegInvalid
+           then do
+            let Just reg_name = Capstone.csRegName handle base_ in
+              putStrLn (printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name)
+           else pure ()
+        if index_ /= ArmRegInvalid
+           then do
+            let Just reg_name = Capstone.csRegName handle index_ in
+              putStrLn (printf "\t\t\toperands[%u].mem.index: REG = %s" i reg_name)
+           else pure ()
+        if scale_ /= 1
+           then putStrLn (printf "\t\t\toperands[%u].mem.scale: %u" i scale_)
+           else pure ()
+        if disp_ /= 0
+           then putStrLn (printf "\t\t\toperands[%u].mem.disp: 0x%x" i disp_)
+           else pure ()
+        case lshift_ of
+          Just ls -> putStrLn (printf "\t\t\toperands[%u].mem.lshift: 0x%x" i ls)
+          Nothing -> pure ()
+      _ ->
+        putStrLn (printf "\t\toperands[%u].type: UNKNOWN" i)
+
+    let neon_lane_ = neon_lane op
+        access_ = access op
+        shift_ = shift op
+        subtracted_ = subtracted op
+        vector_index_ = vectorIndex op
+
+    if neon_lane_ /= -1
+       then putStrLn (printf "\t\toperands[%u].neon_lane = %u" neon_lane_)
+       else pure ()
+
+    -- case access_ of
+    --   csAcRead ->
+    --     putStrLn (printf "\t\toperands[%u].access: READ" i)
+    --     putStrLn ""
+    --   csAcWrite ->
+    --     putStrLn (printf "\t\toperands[%u].access: WRITE" i)
+    --     putStrLn ""
+    --   csAcReadWrite ->
+    --     putStrLn (printf "\t\toperands[%u].access: READ | WRITE" i)
+    --     putStrLn ""
+
+    if (fst shift_ /= ArmSftInvalid) && (snd shift_ /= 0)
+       then putStrLn (printf "\t\t\tShift: %s = %u" (show $ fst shift_) (snd shift_))
+       else pure ()
+    if vector_index_ /= -1
+       then putStrLn (printf "\t\t\toperands[%u].vector_index = %u" i vector_index_)
+       else pure ()
+
+    if subtracted_
+       then putStrLn (printf "\t\t\toperands[%u].subtracted = True" i)
+       else pure ()
+
 
 all_tests =
   [ ( Disassembler { arch                     = Capstone.CsArchArm
@@ -130,5 +264,6 @@ main = do
     putStrLn $ "Code: " ++ to_hex (buffer dis)
     putStrLn "Disasm:"
     disasmIO $ dis
+    -- ioError (userError "Stop")
 
   to_hex code = unwords (map (printf "0x%02X") code)
