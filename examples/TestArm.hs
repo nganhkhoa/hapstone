@@ -1,5 +1,6 @@
 module Main where
 
+import           Control.Monad
 import           Data.Word
 import           Text.Printf
 import           Numeric                        ( showHex )
@@ -61,16 +62,13 @@ print_insn_detail handle insn = do
   a = (showHex $ address insn) ""
 
   printArchInsnInfo arch = do
-    if length operands > 0
-       then putStrLn ("\topcount: " ++ ((show . length) operands))
-       else pure ()
+    when (length operands > 0)
+      $ putStrLn ("\topcount: " ++ ((show . length) operands))
     mapM_ printOperandDetail $ zip [0..] operands
-    if updateFlags arch
-       then putStrLn "\tUpdate-flags: True"
-       else pure ()
-    if writeback arch
-       then putStrLn "\tWrite-back: True"
-       else pure ()
+    when (updateFlags arch)
+      $ putStrLn "\tUpdate-flags: True"
+    when (writeback arch)
+      $ putStrLn "\tWrite-back: True"
     case cc arch of
       ArmCcAl -> pure ()
       ArmCcInvalid -> pure ()
@@ -86,12 +84,10 @@ print_insn_detail handle insn = do
     case vectorData arch of
       ArmVectordataInvalid -> pure ()
       _ -> putStrLn (printf "\tVector-data: %s" (show $ vectorData arch))
-    if vectorSize arch /= 0
-       then putStrLn (printf "\tVector-size: %u" (vectorSize arch))
-       else pure ()
-    if usermode arch
-       then putStrLn (printf "\tUser-mode: True")
-       else pure ()
+    when (vectorSize arch /= 0)
+      $ putStrLn (printf "\tVector-size: %u" (vectorSize arch))
+    when (usermode arch)
+      $ putStrLn (printf "\tUser-mode: True")
     case memBarrier arch of
       ArmMbInvalid -> pure ()
       _ -> putStrLn (printf "\tMem-barrier: %s" (show $ memBarrier arch))
@@ -129,22 +125,19 @@ print_insn_detail handle insn = do
             disp_ = disp mem
             lshift_ = lshift mem
         putStrLn (printf "\t\toperands[%u].type: MEM" i)
-        if base_ /= ArmRegInvalid
-           then do
-            let Just reg_name = Capstone.csRegName handle base_ in
-              putStrLn (printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name)
-           else pure ()
-        if index_ /= ArmRegInvalid
-           then do
-            let Just reg_name = Capstone.csRegName handle index_ in
-              putStrLn (printf "\t\t\toperands[%u].mem.index: REG = %s" i reg_name)
-           else pure ()
-        if scale_ /= 1
-           then putStrLn (printf "\t\t\toperands[%u].mem.scale: %u" i scale_)
-           else pure ()
-        if disp_ /= 0
-           then putStrLn (printf "\t\t\toperands[%u].mem.disp: 0x%x" i disp_)
-           else pure ()
+        when (base_ /= ArmRegInvalid)
+          $ do
+            let Just reg_name = Capstone.csRegName handle base_
+            putStrLn (printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name)
+
+        when (index_ /= ArmRegInvalid)
+          $ do
+            let Just reg_name = Capstone.csRegName handle index_
+            putStrLn (printf "\t\t\toperands[%u].mem.index: REG = %s" i reg_name)
+        when (scale_ /= 1)
+          $ putStrLn (printf "\t\t\toperands[%u].mem.scale: %u" i scale_)
+        when (disp_ /= 0)
+          $ putStrLn (printf "\t\t\toperands[%u].mem.disp: 0x%x" i disp_)
         case lshift_ of
           Just ls -> putStrLn (printf "\t\t\toperands[%u].mem.lshift: 0x%x" i ls)
           Nothing -> pure ()
@@ -157,10 +150,10 @@ print_insn_detail handle insn = do
         subtracted_ = subtracted op
         vector_index_ = vectorIndex op
 
-    if neon_lane_ /= -1
-       then putStrLn (printf "\t\toperands[%u].neon_lane = %u" neon_lane_)
-       else pure ()
+    when (neon_lane_ /= -1)
+      $ putStrLn (printf "\t\toperands[%u].neon_lane = %u" neon_lane_)
 
+    -- TODO: wait for access enum
     -- case access_ of
     --   csAcRead ->
     --     putStrLn (printf "\t\toperands[%u].access: READ" i)
@@ -172,16 +165,12 @@ print_insn_detail handle insn = do
     --     putStrLn (printf "\t\toperands[%u].access: READ | WRITE" i)
     --     putStrLn ""
 
-    if (fst shift_ /= ArmSftInvalid) && (snd shift_ /= 0)
-       then putStrLn (printf "\t\t\tShift: %s = %u" (show $ fst shift_) (snd shift_))
-       else pure ()
-    if vector_index_ /= -1
-       then putStrLn (printf "\t\t\toperands[%u].vector_index = %u" i vector_index_)
-       else pure ()
-
-    if subtracted_
-       then putStrLn (printf "\t\t\toperands[%u].subtracted = True" i)
-       else pure ()
+    when ((fst shift_ /= ArmSftInvalid) && (snd shift_ /= 0))
+      $ putStrLn (printf "\t\t\tShift: %s = %u" (show $ fst shift_) (snd shift_))
+    when (vector_index_ /= -1)
+      $ putStrLn (printf "\t\t\toperands[%u].vector_index = %u" i vector_index_)
+    when subtracted_
+      $ putStrLn (printf "\t\t\toperands[%u].subtracted = True" i)
 
 
 all_tests =
@@ -264,6 +253,5 @@ main = do
     putStrLn $ "Code: " ++ to_hex (buffer dis)
     putStrLn "Disasm:"
     disasmIO $ dis
-    -- ioError (userError "Stop")
 
   to_hex code = unwords (map (printf "0x%02X") code)
