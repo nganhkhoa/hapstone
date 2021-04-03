@@ -91,7 +91,7 @@ instance Storable M680xOpExt where
     alignment _ = {#alignof m680x_op_ext#}
     peek p = M680xOpExt
         <$> (fromIntegral <$> {#get m680x_op_ext->address#} p)
-        <*> ({#get m680x_op_ext->indirect#} p)
+        <*> (toBool <$> (peekByteOff p {#offsetof m680x_op_ext->indirect#} :: IO Word8))
     poke p (M680xOpExt a i) = do
         {#set m680x_op_ext->address#} p (fromIntegral a)
         {#set m680x_op_ext->indirect#} p i

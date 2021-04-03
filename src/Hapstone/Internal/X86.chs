@@ -207,7 +207,7 @@ instance Storable CsX86Op where
         <*> (fromIntegral <$> {#get cs_x86_op->size#}  p)
         <*> (fromIntegral <$> {#get cs_x86_op->access#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_x86_op->avx_bcast#} p)
-        <*> ({#get cs_x86_op->avx_zero_opmask#} p)
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_x86_op->avx_zero_opmask#} :: IO Word8))
     poke p (CsX86Op val s a ab az) = do
         let regP = plusPtr p {#offsetof cs_x86_op->reg#}
             immP = plusPtr p {#offsetof cs_x86_op->imm#}
@@ -306,7 +306,7 @@ instance Storable CsX86 where
         <*> ((toEnum . fromIntegral) <$> {#get cs_x86->xop_cc#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_x86->sse_cc#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_x86->avx_cc#} p)
-        <*> ({#get cs_x86->avx_sae#} p)
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_x86->avx_sae#} :: IO Word8))
         <*> ((toEnum . fromIntegral) <$> {#get cs_x86->avx_rm#} p)
         <*> (fromIntegral <$> {#get cs_x86->eflags#} p)
         <*> do num <- (fromIntegral <$> {#get cs_x86->op_count#} p)

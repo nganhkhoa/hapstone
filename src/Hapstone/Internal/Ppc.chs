@@ -139,7 +139,7 @@ instance Storable CsPpc where
     peek p = CsPpc
         <$> ((toEnum . fromIntegral) <$> {#get cs_ppc->bc#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_ppc->bh#} p)
-        <*> {#get cs_ppc->update_cr0#} p
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_ppc->update_cr0#} :: IO Word8))
         <*> do num <- fromIntegral <$> {#get cs_ppc->op_count#} p
                let ptr = plusPtr p {#offsetof cs_ppc.operands#}
                peekArray num ptr
