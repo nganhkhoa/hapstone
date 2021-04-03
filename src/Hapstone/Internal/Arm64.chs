@@ -224,8 +224,8 @@ instance Storable CsArm64 where
     alignment _ = {#alignof cs_arm64#}
     peek p = CsArm64
         <$> (toEnum . fromIntegral <$> {#get cs_arm64->cc#} p)
-        <*> ({#get cs_arm64->update_flags#} p)
-        <*> ({#get cs_arm64->writeback#} p)
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_arm64->update_flags#} :: IO Word8))
+        <*> (toBool <$> (peekByteOff p {#offsetof cs_arm64->writeback#} :: IO Word8))
         <*> do num <- fromIntegral <$> {#get cs_arm64->op_count#} p
                let ptr = plusPtr p {#offsetof cs_arm64.operands#}
                peekArray num ptr

@@ -48,13 +48,9 @@ armv8 =
 print_insn_detail :: Capstone.Csh -> Capstone.CsInsn -> IO ()
 print_insn_detail handle insn = do
   putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
-  case Capstone.detail insn of
-    Just detail -> do
-      case archInfo detail of
-        Just (Arm arch) -> do
-          printArchInsnInfo arch
-        _ -> pure()
-    _ -> pure ()
+  Just detail <- pure $ Capstone.detail insn
+  Just (Arm arch) <- pure $ archInfo detail
+  printArchInsnInfo arch
   putStrLn ""
  where
   m = mnemonic insn
@@ -62,6 +58,7 @@ print_insn_detail handle insn = do
   a = (showHex $ address insn) ""
 
   printArchInsnInfo arch = do
+    let operands = Arm.operands arch
     when (length operands > 0)
       $ putStrLn ("\topcount: " ++ ((show . length) operands))
     mapM_ printOperandDetail $ zip [0..] operands
@@ -93,84 +90,82 @@ print_insn_detail handle insn = do
       _ -> putStrLn (printf "\tMem-barrier: %s" (show $ memBarrier arch))
 
     -- TODO: read/writer register, wait cs_reg_access
-      where
-        operands = Arm.operands arch
+   where
+    printOperandDetail :: (Int, Arm.CsArmOp) -> IO ()
+    printOperandDetail (i, op) = do
+      case value op of
+        Reg reg ->
+          let Just reg_name = Capstone.csRegName handle reg in
+            putStrLn (printf "\t\toperands[%u].type: REG = %s" i reg_name)
+        Sysreg reg ->
+          putStrLn (printf "\t\toperands[%u].type: SYSREG = %u" i reg)
+        Imm imm ->
+          putStrLn (printf "\t\toperands[%u].type: IMM = 0x%x" i imm)
+        CImm imm ->
+          putStrLn (printf "\t\toperands[%u].type: C-IMM = %u" i imm)
+        PImm imm ->
+          putStrLn (printf "\t\toperands[%u].type: P-IMM = %u" i imm)
+        Fp fp ->
+          putStrLn (printf "\t\toperands[%u].type: FP = %f" i fp)
+        Setend setend ->
+          case setend of
+            ArmSetendBe ->
+              putStrLn (printf "\t\toperands[%u].type: SETEND = be" i)
+            ArmSetendLe ->
+              putStrLn (printf "\t\toperands[%u].type: SETEND = le" i)
+        Mem mem -> do
+          let base_ = base mem
+              index_ = index mem
+              scale_ = scale mem
+              disp_ = disp mem
+              lshift_ = lshift mem
+          putStrLn (printf "\t\toperands[%u].type: MEM" i)
+          when (base_ /= ArmRegInvalid)
+            $ do
+              let Just reg_name = Capstone.csRegName handle base_
+              putStrLn (printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name)
 
-  printOperandDetail :: (Int, Arm.CsArmOp) -> IO ()
-  printOperandDetail (i, op) = do
-    case value op of
-      Reg reg ->
-        let Just reg_name = Capstone.csRegName handle reg in
-          putStrLn (printf "\t\toperands[%u].type: REG = %s" i reg_name)
-      Sysreg reg ->
-        putStrLn (printf "\t\toperands[%u].type: SYSREG = %u" i reg)
-      Imm imm ->
-        putStrLn (printf "\t\toperands[%u].type: IMM = 0x%x" i imm)
-      CImm imm ->
-        putStrLn (printf "\t\toperands[%u].type: C-IMM = %u" i imm)
-      PImm imm ->
-        putStrLn (printf "\t\toperands[%u].type: P-IMM = %u" i imm)
-      Fp fp ->
-        putStrLn (printf "\t\toperands[%u].type: FP = %f" i fp)
-      Setend setend ->
-        case setend of
-          ArmSetendBe ->
-            putStrLn (printf "\t\toperands[%u].type: SETEND = be" i)
-          ArmSetendLe ->
-            putStrLn (printf "\t\toperands[%u].type: SETEND = le" i)
-      Mem mem -> do
-        let base_ = base mem
-            index_ = index mem
-            scale_ = scale mem
-            disp_ = disp mem
-            lshift_ = lshift mem
-        putStrLn (printf "\t\toperands[%u].type: MEM" i)
-        when (base_ /= ArmRegInvalid)
-          $ do
-            let Just reg_name = Capstone.csRegName handle base_
-            putStrLn (printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name)
+          when (index_ /= ArmRegInvalid)
+            $ do
+              let Just reg_name = Capstone.csRegName handle index_
+              putStrLn (printf "\t\t\toperands[%u].mem.index: REG = %s" i reg_name)
+          when (scale_ /= 1)
+            $ putStrLn (printf "\t\t\toperands[%u].mem.scale: %u" i scale_)
+          when (disp_ /= 0)
+            $ putStrLn (printf "\t\t\toperands[%u].mem.disp: 0x%x" i disp_)
+          case lshift_ of
+            Just ls -> putStrLn (printf "\t\t\toperands[%u].mem.lshift: 0x%x" i ls)
+            Nothing -> pure ()
+        _ ->
+          putStrLn (printf "\t\toperands[%u].type: UNKNOWN" i)
 
-        when (index_ /= ArmRegInvalid)
-          $ do
-            let Just reg_name = Capstone.csRegName handle index_
-            putStrLn (printf "\t\t\toperands[%u].mem.index: REG = %s" i reg_name)
-        when (scale_ /= 1)
-          $ putStrLn (printf "\t\t\toperands[%u].mem.scale: %u" i scale_)
-        when (disp_ /= 0)
-          $ putStrLn (printf "\t\t\toperands[%u].mem.disp: 0x%x" i disp_)
-        case lshift_ of
-          Just ls -> putStrLn (printf "\t\t\toperands[%u].mem.lshift: 0x%x" i ls)
-          Nothing -> pure ()
-      _ ->
-        putStrLn (printf "\t\toperands[%u].type: UNKNOWN" i)
+      let neon_lane_ = neon_lane op
+          access_ = access op
+          shift_ = shift op
+          subtracted_ = subtracted op
+          vector_index_ = vectorIndex op
 
-    let neon_lane_ = neon_lane op
-        access_ = access op
-        shift_ = shift op
-        subtracted_ = subtracted op
-        vector_index_ = vectorIndex op
+      when (neon_lane_ /= -1)
+        $ putStrLn (printf "\t\toperands[%u].neon_lane = %u" neon_lane_)
 
-    when (neon_lane_ /= -1)
-      $ putStrLn (printf "\t\toperands[%u].neon_lane = %u" neon_lane_)
+      -- TODO: wait for access enum
+      -- case access_ of
+      --   csAcRead ->
+      --     putStrLn (printf "\t\toperands[%u].access: READ" i)
+      --     putStrLn ""
+      --   csAcWrite ->
+      --     putStrLn (printf "\t\toperands[%u].access: WRITE" i)
+      --     putStrLn ""
+      --   csAcReadWrite ->
+      --     putStrLn (printf "\t\toperands[%u].access: READ | WRITE" i)
+      --     putStrLn ""
 
-    -- TODO: wait for access enum
-    -- case access_ of
-    --   csAcRead ->
-    --     putStrLn (printf "\t\toperands[%u].access: READ" i)
-    --     putStrLn ""
-    --   csAcWrite ->
-    --     putStrLn (printf "\t\toperands[%u].access: WRITE" i)
-    --     putStrLn ""
-    --   csAcReadWrite ->
-    --     putStrLn (printf "\t\toperands[%u].access: READ | WRITE" i)
-    --     putStrLn ""
-
-    when ((fst shift_ /= ArmSftInvalid) && (snd shift_ /= 0))
-      $ putStrLn (printf "\t\t\tShift: %s = %u" (show $ fst shift_) (snd shift_))
-    when (vector_index_ /= -1)
-      $ putStrLn (printf "\t\t\toperands[%u].vector_index = %u" i vector_index_)
-    when subtracted_
-      $ putStrLn (printf "\t\t\toperands[%u].subtracted = True" i)
+      when ((fst shift_ /= ArmSftInvalid) && (snd shift_ /= 0))
+        $ putStrLn (printf "\t\t\tShift: %s = %u" (show $ fst shift_) (snd shift_))
+      when (vector_index_ /= -1)
+        $ putStrLn (printf "\t\t\toperands[%u].vector_index = %u" i vector_index_)
+      when subtracted_
+        $ putStrLn (printf "\t\t\toperands[%u].subtracted = True" i)
 
 
 all_tests =

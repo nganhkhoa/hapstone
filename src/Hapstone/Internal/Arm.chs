@@ -202,7 +202,7 @@ instance Storable CsArm where
     sizeOf _ = {#sizeof cs_arm#}
     alignment _ = {#alignof cs_arm#}
     peek p = CsArm
-        <$> ({#get cs_arm->usermode#} p)
+        <$> (toBool <$> (peekByteOff p {#offsetof cs_arm->usermode#} :: IO Word8))
         <*> (fromIntegral <$> {#get cs_arm->vector_size#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_arm->vector_data#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_arm->cps_mode#} p)
