@@ -1,11 +1,14 @@
 module Main where
 
+import           Control.Monad
+import           Data.Bits                      ( (.&.) )
 import           Data.Word
 import           Text.Printf
 import           Numeric                        ( showHex )
 
 import           Hapstone.Capstone
 import           Hapstone.Internal.Capstone    as Capstone
+import           Hapstone.Internal.M680x       as M680x
 
 
 m6800_code =
@@ -97,11 +100,76 @@ hd6309_code =
 
 
 print_insn_detail :: Capstone.Csh -> Capstone.CsInsn -> IO ()
-print_insn_detail handle insn = putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+print_insn_detail handle insn = do
+  putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+  Just detail <- pure $ Capstone.detail insn
+  Just (M680x arch) <- pure $ archInfo detail
+  igroups <- pure $ groups detail
+  printArchInsnInfo arch
+  when (length igroups /= 0)
+    $ putStrLn $ printf "\tgroups_count: %u" (length igroups)
+  putStrLn ""
  where
   m = mnemonic insn
   o = opStr insn
   a = (showHex $ address insn) ""
+
+  printArchInsnInfo arch = do
+    let operands = M680x.operands arch
+    mapM_ printOperandDetail $ zip [0..] operands
+   where
+    printOperandDetail :: (Int, M680x.CsM680xOp) -> IO ()
+    printOperandDetail (i, op) = do
+      case value op of
+        Imm imm -> do
+          putStrLn $ printf "\t\toperands[%u].type: IMMEDIATE = #%d" i imm
+        Reg reg -> do
+          let f = flags arch
+              comment1 = i == 0 && (f .&. 1 == 1)
+              comment2 = i == 1 && (f .&. 2 == 1)
+              Just reg_name = Capstone.csRegName handle reg
+          if (comment1 || comment2)
+             then putStrLn $ printf "\t\toperands[%u].type: REGISTER = %s (in mnemonic)" i reg_name
+             else putStrLn $ printf "\t\toperands[%u].type: REGISTER = %s" i reg_name
+        Idx idx -> do
+          let post_pre = if ((idxFlags idx) .&. 4 == 1)
+                            then "post"
+                            else "pre"
+              inc_dec = if (incDec idx > 0)
+                            then "increment"
+                            else "decrement"
+              Just base_reg = Capstone.csRegName handle $ baseReg idx
+              Just offset_reg = Capstone.csRegName handle $ offsetReg idx
+          if ((idxFlags idx) .&. 1 == 1)
+             then putStrLn $ printf "\t\toperands[%u].type: INDEXED INDIRECT" i
+             else putStrLn $ printf "\t\toperands[%u].type: INDEXED" i
+          when (baseReg idx /= M680xRegInvalid)
+            $ putStrLn $ printf "\t\t\tbase register: %s" base_reg
+          when (offsetReg idx /= M680xRegInvalid)
+            $ putStrLn $ printf "\t\t\tbase register: %s" offset_reg
+          when (offsetBits idx /= 0 && offsetReg idx == M680xRegInvalid && incDec idx == 0)
+            $ do
+              putStrLn $ printf "\t\t\toffset: %u" (idxOffset idx)
+              when (baseReg idx == M680xRegPc)
+                $ putStrLn $ printf "\t\t\toffset address: 0x%04x" (offsetAddr idx)
+              putStrLn $ printf "\t\t\toffset bits: %u" (offsetBits idx)
+          when (incDec idx /= 0)
+            $ putStrLn $ printf "\t\t\t%s %s: %d" post_pre inc_dec (abs $ incDec idx)
+        Rel rel ->
+          putStrLn $ printf "\t\toperands[%u].type: RELATIVE = 0x%04x" i (relAddress rel)
+        Ext ext ->
+          if (indirect ext)
+             then putStrLn $ printf "\t\toperands[%u].type: EXTENDED INDIRECT = 0x%04x" i (extAddress ext)
+             else putStrLn $ printf "\t\toperands[%u].type: EXTENDED = 0x%04x" i (extAddress ext)
+        Addr addr ->
+          putStrLn $ printf "\t\toperands[%u].type: DIRECT = 0x%02x" i addr
+        Val val ->
+          putStrLn $ printf "\t\toperands[%u].type: CONSTANT = %u" i val
+        _ -> pure ()
+      when (size op /= 0)
+        $ putStrLn $ printf "\t\t\tsize: %d" (size op)
+      when (access op /= 0)
+        $ putStrLn $ printf "\t\t\taccess: %d" (access op)
 
 all_tests =
   [ ( Disassembler { arch                     = Capstone.CsArchM680x
