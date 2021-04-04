@@ -1,11 +1,13 @@
 module Main where
 
+import           Control.Monad
 import           Data.Word
 import           Text.Printf
 import           Numeric                        ( showHex )
 
 import           Hapstone.Capstone
 import           Hapstone.Internal.Capstone    as Capstone
+import           Hapstone.Internal.Mips        as Mips
 
 mips_code =
   [ 0x0C, 0x10, 0x00, 0x97, 0x00, 0x00, 0x00, 0x00, 0x24
@@ -27,11 +29,37 @@ mips_32r6 =
   ]
 
 print_insn_detail :: Capstone.Csh -> Capstone.CsInsn -> IO ()
-print_insn_detail handle insn = putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+print_insn_detail handle insn = do
+  putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+  Just detail <- pure $ Capstone.detail insn
+  Just (Mips arch) <- pure $ archInfo detail
+  printArchInsnInfo arch
+  putStrLn ""
  where
   m = mnemonic insn
   o = opStr insn
   a = (showHex $ address insn) ""
+
+  printArchInsnInfo (CsMips operands) = do
+    putStrLn ("\topcount: " ++ ((show . length) operands))
+    mapM_ printOperandDetail $ zip [0..] operands
+   where
+    printOperandDetail :: (Int, Mips.CsMipsOp) -> IO ()
+    printOperandDetail (i, op) =
+      case op of
+        Reg reg -> do
+          let Just reg_name = Capstone.csRegName handle reg
+          putStrLn $ printf "\t\toperands[%u].type: REG = %s" i reg_name
+        Imm imm ->
+          putStrLn $ printf "\t\toperands[%u].type: IMM = 0x%x" i imm
+        Mem mem -> do
+          putStrLn $ printf "\t\toperands[%u].type: MEM" i
+          when (base mem /= MipsRegInvalid)
+            $ do
+              let Just reg_name = Capstone.csRegName handle (base mem)
+              putStrLn $ printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name
+          when (disp mem /= 0)
+            $ putStrLn $ printf "\t\t\toperands[%u].mem.disp: 0x%x" i (disp mem)
 
 all_tests =
   [ ( Disassembler { arch                     = Capstone.CsArchMips
