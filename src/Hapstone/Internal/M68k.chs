@@ -107,13 +107,13 @@ data CsM68kOpValue
     | SImm Float
     | Reg M68kReg
     | RegPair (M68kReg, M68kReg)
+    | Mem M68kOpMemStruct
+    | BrDisp M68kOpBrDispStruct
     | CsM68kOpInvalid
     deriving (Show, Eq)
 
 data CsM68kOp = CsM68kOp
     { value :: CsM68kOpValue
-    , mem :: M68kOpMemStruct
-    , br :: M68kOpBrDispStruct
     , registerBits :: Word32
     , addressMode :: M68kAddressMode
     } deriving (Show, Eq)
@@ -127,6 +127,8 @@ instance Storable CsM68kOp where
             let regP = plusPtr p {#offsetof cs_m68k_op->reg#}
             let reg0P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_0#}
             let reg1P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_1#}
+            let memP = (plusPtr p {#offsetof cs_m68k_op->mem#})
+            let brP = (plusPtr p {#offsetof cs_m68k_op->br_disp#})
             case toEnum t of
                 M68kOpImm -> (Imm . fromIntegral) <$> {#get cs_m68k_op->imm#} p
                 M68kOpFpDouble -> (DImm . realToFrac) <$> {#get cs_m68k_op->dimm#} p
@@ -136,14 +138,12 @@ instance Storable CsM68kOp where
                     let r0 = (toEnum . fromIntegral) <$> {#get cs_m68k_op->reg_pair.reg_0#} p
                     let r1 = (toEnum . fromIntegral) <$> {#get cs_m68k_op->reg_pair.reg_1#} p
                     RegPair <$> ((,) <$> r0 <*> r1)
+                M68kOpMem -> Mem <$> peek memP
+                M68kOpBrDisp -> BrDisp <$> peek brP
                 _ -> return CsM68kOpInvalid
-        <*> peek (plusPtr p {#offsetof cs_m68k_op->mem#})
-        <*> peek (plusPtr p {#offsetof cs_m68k_op->br_disp#})
         <*> (fromIntegral <$> {#get cs_m68k_op->register_bits#} p)
         <*> ((toEnum . fromIntegral) <$> {#get cs_m68k_op->address_mode#} p)
-    poke p (CsM68kOp v m b r a) = do
-        poke (plusPtr p {#offsetof cs_m68k_op->mem#}) m
-        poke (plusPtr p {#offsetof cs_m68k_op->br_disp#}) b
+    poke p (CsM68kOp v r a) = do
         {#set cs_m68k_op->address_mode#} p (fromIntegral $ fromEnum a)
         {#set cs_m68k_op->register_bits#} p (fromIntegral r)
         let regP = plusPtr p {#offsetof cs_m68k_op->reg#}
@@ -152,6 +152,8 @@ instance Storable CsM68kOp where
             simmP = plusPtr p {#offsetof cs_m68k_op->simm#}
             reg0P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_0#}
             reg1P = plusPtr p {#offsetof cs_m68k_op->reg_pair.reg_1#}
+            memP = (plusPtr p {#offsetof cs_m68k_op->mem#})
+            brP = (plusPtr p {#offsetof cs_m68k_op->br_disp#})
             setType = {#set cs_m68k_op->type#} p . fromIntegral . fromEnum
         case v of
           Reg r -> do
@@ -170,6 +172,10 @@ instance Storable CsM68kOp where
               poke reg0P (fromIntegral $ fromEnum r0 :: CUInt)
               poke reg1P (fromIntegral $ fromEnum r1 :: CUInt)
               setType M68kOpRegPair
+          Mem mem ->
+              poke memP mem
+          BrDisp brdisp ->
+              poke brP brdisp
           _ -> setType M68kOpInvalid
 
 {#enum m68k_cpu_size as M68kCpuSize {underscoreToCase}

@@ -1,11 +1,13 @@
 module Main where
 
+import           Control.Monad
 import           Data.Word
 import           Text.Printf
 import           Numeric                        ( showHex )
 
 import           Hapstone.Capstone
 import           Hapstone.Internal.Capstone    as Capstone
+import           Hapstone.Internal.M68k        as M68k
 
 m68k_code =
   [ 0x4c, 0x00, 0x54, 0x04, 0x48, 0xe7, 0xe0, 0x30, 0x4c
@@ -19,11 +21,64 @@ m68k_code =
 
 
 print_insn_detail :: Capstone.Csh -> Capstone.CsInsn -> IO ()
-print_insn_detail handle insn = putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+print_insn_detail handle insn = do
+  putStrLn ("0x" ++ a ++ ":\t" ++ m ++ "\t" ++ o)
+  Just detail <- pure $ Capstone.detail insn
+  Just (M68k arch) <- pure $ archInfo detail
+  igroups <- pure $ groups detail
+  printArchInsnInfo arch
+  when (length igroups /= 0)
+    $ putStrLn $ printf "\tgroups_count: %u" (length igroups)
+  putStrLn ""
  where
   m = mnemonic insn
   o = opStr insn
   a = (showHex $ address insn) ""
+
+  printArchInsnInfo arch = do
+    let operands = M68k.operands arch
+    putStrLn ("\topcount: " ++ ((show . length) operands))
+    mapM_ printOperandDetail $ zip [0..] operands
+   where
+    printOperandDetail :: (Int, M68k.CsM68kOp) -> IO ()
+    printOperandDetail (i, op) =
+      case value op of
+        Imm imm ->
+          putStrLn $ printf "\t\toperands[%u].type: IMM = 0x%x" i imm
+        DImm dimm -> do
+          putStrLn $ printf "\t\toperands[%u].type: FP_DOUBLE" i
+          putStrLn $ printf "\t\toperands[%u].simm: %lf" i dimm
+        SImm simm -> do
+          putStrLn $ printf "\t\toperands[%u].type: FP_SINGLE" i
+          putStrLn $ printf "\t\toperands[%u].simm: %f" i simm
+        Reg reg -> do
+          let Just reg_name = Capstone.csRegName handle reg
+          putStrLn $ printf "\t\toperands[%u].type: REG = %s" i reg_name
+        BrDisp brdisp -> do
+          putStrLn $ printf "\t\toperands[%u].br_disp.disp: 0x%x" i (brDisp brdisp)
+          putStrLn $ printf "\t\toperands[%u].br_disp.disp_size: %s" i (show $ brSize brdisp)
+        Mem mem -> do
+          let baseReg_ = baseReg mem
+              indexReg_ = indexReg mem
+          putStrLn $ printf "\t\toperands[%u].type: MEM" i
+          when (baseReg_ /= M68kRegInvalid)
+            $ do
+              let Just reg_name = Capstone.csRegName handle baseReg_
+              putStrLn $ printf "\t\t\toperands[%u].mem.base: REG = %s" i reg_name
+          when (indexReg_ /= M68kRegInvalid)
+            $ do
+              let Just reg_name = Capstone.csRegName handle indexReg_
+              putStrLn $ printf "\t\t\toperands[%u].mem.index: REG = %s" i reg_name
+              if (indexSize mem > 0)
+                 then putStrLn $ printf "\t\t\toperands[%u].mem.index: size = l" i
+                 else putStrLn $ printf "\t\t\toperands[%u].mem.index: size = w" i
+          when (memDisp mem /= 0)
+            $ putStrLn $ printf "\t\t\toperands[%u].mem.disp: 0x%x" i (memDisp mem)
+          when (scale mem /= 0)
+            $ putStrLn $ printf "\t\t\toperands[%u].mem.scale: %d" i (scale mem)
+          putStrLn $ printf "\t\taddress mode: %s" (show $ addressMode op)
+        RegPair (reg1, reg2) -> pure ()
+        _ -> pure ()
 
 all_tests =
   [ ( Disassembler { arch                     = Capstone.CsArchM68k
