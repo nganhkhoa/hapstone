@@ -34,7 +34,7 @@ library
   extra-libraries:     capstone
   extra-lib-dirs:      /home/thewormkill/clones/forks/capstone/tests
   include-dirs:        /home/thewormkill/clones/forks/capstone/include
-  build-tools:         c2hs
+  build-tool-depends: c2hs:c2hs >= 0.28.7
 
 test-suite hapstone-test
   type:                exitcode-stdio-1.0
