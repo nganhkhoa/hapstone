@@ -68,37 +68,40 @@ csX86OpSpec = describe "Storable CsX86Op" $ do
 getCsX86 :: IO CsX86
 getCsX86 = do
     ptr <- mallocArray (sizeOf csX86) :: IO (Ptr Word8)
-    pokeArray ptr ([ 0x0, 0x1, 0x2, 0x3 -- prefix
-                   , 0x4, 0x5, 0x6, 0x7 -- opcode
-                   , 0x0 -- rex
+    pokeArray ptr ([ 0, 1, 2, 3 -- prefix
+                   , 4, 5, 6, 7 -- opcode
+                   , 0 -- rex
                    , 0x20 -- address_size
                    , 0x21 -- modrm
-                   , 0x0 -- sib
+                   , 0 -- sib
                    ] :: [Word8])
-    poke (plusPtr ptr 12) (0x01234567 :: Int32) -- disp
-    poke (plusPtr ptr 16) (fromIntegral $ fromEnum X86RegAl :: Word32)
-    poke (plusPtr ptr 20) (0x2 :: Int8) -- sibScale
-    poke (plusPtr ptr 24) (fromIntegral $ fromEnum X86RegEdx :: Word32)
-    poke (plusPtr ptr 28) (fromIntegral $ fromEnum X86SseCcEq :: Word32)
-    poke (plusPtr ptr 32) (fromIntegral $ fromEnum X86AvxCcEq :: Word32)
-    poke (plusPtr ptr 36) (0x1 :: Word8) -- avxSae
-    poke (plusPtr ptr 40) (fromIntegral $ fromEnum X86AvxRmRu :: Word32)
-    poke (plusPtr ptr 44) (0x1 :: Word8) -- op_count
-    poke (plusPtr ptr 48) csX86Op
+    poke (plusPtr ptr 16) (0x01234567 :: Int64) -- disp
+    poke (plusPtr ptr 24) (fromIntegral $ fromEnum X86RegAl :: Word32)
+    poke (plusPtr ptr 28) (2 :: Int8) -- sibScale
+    poke (plusPtr ptr 32) (fromIntegral $ fromEnum X86RegEdx :: Word32)
+    poke (plusPtr ptr 36) (fromIntegral $ fromEnum X86XopCcEq :: Word32)
+    poke (plusPtr ptr 40) (fromIntegral $ fromEnum X86SseCcEq :: Word32)
+    poke (plusPtr ptr 44) (fromIntegral $ fromEnum X86AvxCcEq :: Word32)
+    poke (plusPtr ptr 48) (1 :: Word8) -- avxSae
+    poke (plusPtr ptr 52) (fromIntegral $ fromEnum X86AvxRmRu :: Word32)
+    poke (plusPtr ptr 56) (0xDEADBEEF :: Word64) -- flags
+    poke (plusPtr ptr 64) (1 :: Word8) -- op_count
+    poke (plusPtr ptr 72) csX86Op
+    poke (plusPtr ptr 456) $ CsX86Encoding 1 2 3 4 5
     peek (castPtr ptr) <* free ptr
 
 csX86 :: CsX86
-csX86 = CsX86 (Nothing, Just 0x1, Just 0x2, Just 0x3) [0x4, 0x5, 0x6, 0x7]
+csX86 = CsX86 (Nothing, Just 1, Just 2, Just 3) [4, 5, 6, 7]
     0x0 0x20 0x21 Nothing (Just 0x01234567) X86RegAl 0x2 X86RegEdx
     X86XopCcEq X86SseCcEq X86AvxCcEq True X86AvxRmRu 0xDEADBEEF [csX86Op]
-    $ CsX86Encoding 0 0 0 0 0
+    $ CsX86Encoding 1 2 3 4 5
 
 -- | CsX86 spec
 csX86Spec :: Spec
 csX86Spec = describe "Storable CsX86" $ do
     it "has a memory-layout we can handle" $
         sizeOf (undefined :: CsX86) ==
-            4 + 4 + 1 + 1 + 1 + 1 + 4 + 4 + 1 + 3 + 4 + 4 + 4 + 1 + 3 + 4 + 1 + 3 + 48 * 8
+            4 + 4 + 1 + 1 + 1 + 1 + 4 + 4 + 8 + 4 + 1 + 3 + 4 + 4 + 4 + 1 + 3 + 4 + 1 + 3 + 4 + 8 + 48 * 8 + 8
     it "has matching peek- and poke-implementations" $ property $
         \s@CsX86{} ->
             alloca (\p -> poke p s >> peek p) `shouldReturn` s

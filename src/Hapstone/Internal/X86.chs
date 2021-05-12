@@ -248,7 +248,7 @@ instance Storable CsX86Encoding where
         <*> (fromIntegral <$> {#get cs_x86_encoding->imm_size#} p)
     poke p (CsX86Encoding moff doff dsize ioff isize) = do
         {#set cs_x86_encoding->modrm_offset#} p (fromIntegral moff)
-        {#set cs_x86_encoding->disp_size#} p (fromIntegral doff)
+        {#set cs_x86_encoding->disp_offset#} p (fromIntegral doff)
         {#set cs_x86_encoding->disp_size#} p (fromIntegral dsize)
         {#set cs_x86_encoding->imm_offset#} p (fromIntegral ioff)
         {#set cs_x86_encoding->imm_size#} p (fromIntegral isize)
