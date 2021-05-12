@@ -51,7 +51,7 @@ test-suite hapstone-test
                        Internal.Sparc.StorableSpec,
                        Internal.Sparc.Default,
                        Internal.SystemZ.StorableSpec,
-                       Internal.SystemZ.Default
+                       Internal.SystemZ.Default,
                        Internal.X86.StorableSpec,
                        Internal.X86.Default,
                        Internal.XCore.StorableSpec,
