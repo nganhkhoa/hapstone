@@ -200,8 +200,8 @@ data CsDetail = CsDetail
 -- for that.
 
 instance Storable CsDetail where
-    sizeOf _ = 1560
-    alignment _ = 8
+    sizeOf _ = {#sizeof cs_detail#}
+    alignment _ = {#alignof cs_detail#}
     peek p = CsDetail
         <$> do num <- fromIntegral <$> {#get cs_detail->regs_read_count#} p
                let ptr = plusPtr p {#offsetof cs_detail.regs_read#}

@@ -93,7 +93,8 @@ csDetail = CsDetail
 csDetailStorableSpec :: Spec
 csDetailStorableSpec = describe "Storable CsDetail" $ do
     it "has a memory layout we can manage" $
-        sizeOf (undefined :: CsDetail) == 24 + 1 + 1 + 40 + 1 + 8 + 1 + 4 + 1480
+        -- Probably not necessary with CsDetail size being automatically calculated now
+        sizeOf (undefined :: CsDetail) == 24 + 1 + 1 + 40 + 1 + 8 + 1 + 4 + 1768
     it "has matching peek- and poke-implementations with no arch specifics" $
         property $ \s@CsDetail{} ->
             alloca (\p -> poke p s >> peek p) `shouldReturn` s
