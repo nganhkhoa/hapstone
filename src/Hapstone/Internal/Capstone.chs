@@ -214,19 +214,19 @@ instance Storable CsDetail where
                peekArray num ptr
         <*> pure Nothing
     poke p (CsDetail rR rW g a) = do
-        {#set cs_detail->regs_read_count#} p (fromIntegral $ length rR)
+        {#set cs_detail->regs_read_count#} p $ fromIntegral $ length rR
         if length rR > 12
            then error "regs_read overflew 12 elements (24 bytes)"
            else pokeArray (plusPtr p {#offsetof cs_detail.regs_read#}) rR
-        {#set cs_detail->regs_write_count#} p (fromIntegral $ length rW)
+        {#set cs_detail->regs_write_count#} p $ fromIntegral $ length rW
         if length rW > 20
            then error "regs_write overflew 20 elements (40 bytes)"
            else pokeArray (plusPtr p {#offsetof cs_detail.regs_write#}) rW
-        {#set cs_detail->groups_count#} p (fromIntegral $ length g)
+        {#set cs_detail->groups_count#} p $ fromIntegral $ length g
         if length g > 8
            then error "groups overflew 8 bytes"
            else pokeArray (plusPtr p {#offsetof cs_detail.groups#}) g
-        let bP = plusPtr p ({#offsetof cs_detail.groups_count#} + 1)
+        let bP = plusPtr p $ {#offsetof cs_detail.groups_count#} + 1
         case a of
           Just (X86 x) -> poke bP x
           Just (Arm64 x) -> poke bP x

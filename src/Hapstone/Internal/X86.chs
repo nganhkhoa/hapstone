@@ -224,8 +224,8 @@ instance Storable CsX86Op where
               poke memP m
               setType X86OpMem
           Undefined -> setType X86OpInvalid
-        {#set cs_x86_op->size#} p (fromIntegral s)
-        {#set cs_x86_op->access#} p (fromIntegral a)
+        {#set cs_x86_op->size#} p $ fromIntegral s
+        {#set cs_x86_op->access#} p $ fromIntegral a
         {#set cs_x86_op->avx_bcast#} p $ fromIntegral $ fromEnum ab
         {#set cs_x86_op->avx_zero_opmask#} p az
 
