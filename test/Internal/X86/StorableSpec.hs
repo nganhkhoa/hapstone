@@ -90,7 +90,8 @@ getCsX86 = do
 csX86 :: CsX86
 csX86 = CsX86 (Nothing, Just 0x1, Just 0x2, Just 0x3) [0x4, 0x5, 0x6, 0x7]
     0x0 0x20 0x21 Nothing (Just 0x01234567) X86RegAl 0x2 X86RegEdx
-    X86SseCcEq X86AvxCcEq True X86AvxRmRu [csX86Op]
+    X86XopCcEq X86SseCcEq X86AvxCcEq True X86AvxRmRu 0xDEADBEEF [csX86Op]
+    $ CsX86Encoding 0 0 0 0 0
 
 -- | CsX86 spec
 csX86Spec :: Spec

@@ -186,8 +186,8 @@ data ArchInfo
 
 -- | instruction information
 data CsDetail = CsDetail
-    { regsRead :: [Word8] -- ^ registers read by this instruction
-    , regsWrite :: [Word8] -- ^ registers written by this instruction
+    { regsRead :: [Word16] -- ^ registers read by this instruction
+    , regsWrite :: [Word16] -- ^ registers written by this instruction
     , groups :: [Word8] -- ^ instruction groups this instruction belongs to
     , archInfo :: Maybe ArchInfo -- ^ (optional) architecture-specific info
     } deriving (Show, Eq)
@@ -216,11 +216,11 @@ instance Storable CsDetail where
     poke p (CsDetail rR rW g a) = do
         {#set cs_detail->regs_read_count#} p (fromIntegral $ length rR)
         if length rR > 12
-           then error "regs_read overflew 12 bytes"
+           then error "regs_read overflew 12 elements (24 bytes)"
            else pokeArray (plusPtr p {#offsetof cs_detail.regs_read#}) rR
         {#set cs_detail->regs_write_count#} p (fromIntegral $ length rW)
         if length rW > 20
-           then error "regs_write overflew 20 bytes"
+           then error "regs_write overflew 20 elements (40 bytes)"
            else pokeArray (plusPtr p {#offsetof cs_detail.regs_write#}) rW
         {#set cs_detail->groups_count#} p (fromIntegral $ length g)
         if length g > 8
