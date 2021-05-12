@@ -10,7 +10,7 @@ maintainer:          twk@twki.de
 copyright:           2016 - 2017 Inokentiy Babushkin
 category:            Disassembler
 build-type:          Simple
-cabal-version:       >=1.10
+cabal-version:       >=2.0
 
 library
   hs-source-dirs:      src
