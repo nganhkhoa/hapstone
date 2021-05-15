@@ -224,9 +224,9 @@ instance Storable CsX86Op where
               poke memP m
               setType X86OpMem
           Undefined -> setType X86OpInvalid
-        {#set cs_x86_op->size#} p (fromIntegral s)
-        {#set cs_x86_op->access#} p (fromIntegral a)
-        {#set cs_x86_op->access#} p (fromIntegral $ fromEnum ab)
+        {#set cs_x86_op->size#} p $ fromIntegral s
+        {#set cs_x86_op->access#} p $ fromIntegral a
+        {#set cs_x86_op->avx_bcast#} p $ fromIntegral $ fromEnum ab
         {#set cs_x86_op->avx_zero_opmask#} p az
 
 data CsX86Encoding = CsX86Encoding
@@ -248,7 +248,7 @@ instance Storable CsX86Encoding where
         <*> (fromIntegral <$> {#get cs_x86_encoding->imm_size#} p)
     poke p (CsX86Encoding moff doff dsize ioff isize) = do
         {#set cs_x86_encoding->modrm_offset#} p (fromIntegral moff)
-        {#set cs_x86_encoding->disp_size#} p (fromIntegral doff)
+        {#set cs_x86_encoding->disp_offset#} p (fromIntegral doff)
         {#set cs_x86_encoding->disp_size#} p (fromIntegral dsize)
         {#set cs_x86_encoding->imm_offset#} p (fromIntegral ioff)
         {#set cs_x86_encoding->imm_size#} p (fromIntegral isize)
@@ -278,7 +278,7 @@ data CsX86 = CsX86
     , avxCc :: X86AvxCc -- ^ AVX condition code
     , avxSae :: Bool -- ^ AXV Supress all Exception
     , avxRm :: X86AvxRm -- ^ AVX static rounding mode
-    , flags :: Word64 -- ^ flags updated by this instruction
+    , flags :: Word64 -- ^ flags updated by this instruction (a union of two different flag regs in C)
     , operands :: [CsX86Op] -- ^ operand list for this instruction, *MUST*
                             -- have <= 8 elements, else you'll get a runtime
                             -- error when you (implicitly) try to write it to

@@ -13,7 +13,7 @@ of versatility.
 
 TODO: write a proper user guide here.
 -}
-module Hapstone.Capstone 
+module Hapstone.Capstone
     ( disasmIO
     , disasmSimpleIO
     , Disassembler(..)
@@ -40,7 +40,7 @@ foreign import ccall "wrapper"
 
 -- | wrap a relatively safe function to get a callback
 -- "safe" in this context means that the buffer remains unmodified
-mkCallback :: Storable a 
+mkCallback :: Storable a
            => (([Word8], [Word8]) -> a -> IO CSize)
            -> IO CsSkipdataCallback
 mkCallback = allocCallback . mkCallback'

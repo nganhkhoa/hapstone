@@ -186,8 +186,8 @@ data ArchInfo
 
 -- | instruction information
 data CsDetail = CsDetail
-    { regsRead :: [Word8] -- ^ registers read by this instruction
-    , regsWrite :: [Word8] -- ^ registers written by this instruction
+    { regsRead :: [Word16] -- ^ registers read by this instruction
+    , regsWrite :: [Word16] -- ^ registers written by this instruction
     , groups :: [Word8] -- ^ instruction groups this instruction belongs to
     , archInfo :: Maybe ArchInfo -- ^ (optional) architecture-specific info
     } deriving (Show, Eq)
@@ -200,33 +200,33 @@ data CsDetail = CsDetail
 -- for that.
 
 instance Storable CsDetail where
-    sizeOf _ = 1560
-    alignment _ = 8
+    sizeOf _ = {#sizeof cs_detail#}
+    alignment _ = {#alignof cs_detail#}
     peek p = CsDetail
-        <$> do num <- fromIntegral <$> {#get cs_detail->regs_read_count#} p
+        <$> do num <- fromIntegral <$> {#get cs_detail.regs_read_count#} p
                let ptr = plusPtr p {#offsetof cs_detail.regs_read#}
                peekArray num ptr
-        <*> do num <- fromIntegral <$> {#get cs_detail->regs_write_count#} p
+        <*> do num <- fromIntegral <$> {#get cs_detail.regs_write_count#} p
                let ptr = plusPtr p {#offsetof cs_detail.regs_write#}
                peekArray num ptr
-        <*> do num <- fromIntegral <$> {#get cs_detail->groups_count#} p
+        <*> do num <- fromIntegral <$> {#get cs_detail.groups_count#} p
                let ptr = plusPtr p {#offsetof cs_detail.groups#}
                peekArray num ptr
         <*> pure Nothing
     poke p (CsDetail rR rW g a) = do
-        {#set cs_detail->regs_read_count#} p (fromIntegral $ length rR)
+        {#set cs_detail.regs_read_count#} p $ fromIntegral $ length rR
         if length rR > 12
-           then error "regs_read overflew 12 bytes"
+           then error "regs_read overflew 12 elements (24 bytes)"
            else pokeArray (plusPtr p {#offsetof cs_detail.regs_read#}) rR
-        {#set cs_detail->regs_write_count#} p (fromIntegral $ length rW)
+        {#set cs_detail.regs_write_count#} p $ fromIntegral $ length rW
         if length rW > 20
-           then error "regs_write overflew 20 bytes"
+           then error "regs_write overflew 20 elements (40 bytes)"
            else pokeArray (plusPtr p {#offsetof cs_detail.regs_write#}) rW
-        {#set cs_detail->groups_count#} p (fromIntegral $ length g)
+        {#set cs_detail.groups_count#} p $ fromIntegral $ length g
         if length g > 8
            then error "groups overflew 8 bytes"
            else pokeArray (plusPtr p {#offsetof cs_detail.groups#}) g
-        let bP = plusPtr p ({#offsetof cs_detail.groups_count#} + 1)
+        let bP = plusPtr p $ {#offsetof cs_detail.x86#}
         case a of
           Just (X86 x) -> poke bP x
           Just (Arm64 x) -> poke bP x
@@ -246,7 +246,7 @@ instance Storable CsDetail where
 peekDetail :: CsArch -> Ptr CsDetail -> IO CsDetail
 peekDetail arch p = do
     detail <- peek p
-    let bP = plusPtr p {#offsetof cs_detail->x86#}
+    let bP = plusPtr p {#offsetof cs_detail.x86#}
     aI <- case arch of
             CsArchX86 -> X86 <$> peek bP
             CsArchArm64 -> Arm64 <$> peek bP
@@ -283,7 +283,7 @@ instance Storable CsInsn where
                let ptr = plusPtr p {#offsetof cs_insn->bytes#}
                peekArray num ptr
         <*> ((map castCCharToChar . takeWhile (/=0)) <$>
-            peekArray 32 (plusPtr p {#offsetof cs_insn->mnemonic#}))
+            peekArray {#const CS_MNEMONIC_SIZE#} (plusPtr p {#offsetof cs_insn->mnemonic#}))
         <*> ((map castCCharToChar . takeWhile (/=0)) <$>
             peekArray 160 (plusPtr p {#offsetof cs_insn->op_str#}))
         <*> return Nothing
@@ -327,7 +327,7 @@ peekArch arch p = do
 -- | an arch-sensitive peekElemOff for cs_insn
 peekElemOffArch :: CsArch -> Ptr CsInsn -> Int -> IO CsInsn
 peekElemOffArch arch ptr off =
-    peekArch arch (plusPtr ptr (off * sizeOf (undefined :: CsInsn)))
+    peekArch arch $ plusPtr ptr $ off * {#sizeof cs_insn#}
 
 -- | an arch-sensitive peekArray for cs_insn
 peekArrayArch :: CsArch -> Int -> Ptr CsInsn -> IO [CsInsn]
