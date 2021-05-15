@@ -6,6 +6,8 @@ import Foreign.C.Types
 import Test.Hspec
 import Test.QuickCheck
 
+import Hapstone.Capstone (disasmSimpleIO, Disassembler(..), defaultAction)
+import Hapstone.Internal.Capstone
 import Hapstone.Internal.X86
 
 import Internal.X86.Default
@@ -16,13 +18,14 @@ spec = describe "Hapstone.Internal.X86" $ do
     x86OpMemStructSpec
     csX86OpSpec
     csX86Spec
+    x86DisasmSpec
 
 getX86OpMemStruct :: IO X86OpMemStruct
 getX86OpMemStruct = do
     ptr <- mallocArray (sizeOf x86OpMemStruct) :: IO (Ptr Word8)
-    poke (castPtr ptr) (fromIntegral $ fromEnum X86RegEax :: Word32)
-    poke (plusPtr ptr 4) (fromIntegral $ fromEnum X86RegEdi :: Word32)
-    poke (plusPtr ptr 8) (fromIntegral $ fromEnum X86RegDx :: Word32)
+    poke (castPtr ptr) $ fromEnum X86RegEax
+    poke (plusPtr ptr 4) $ fromEnum X86RegEdi
+    poke (plusPtr ptr 8) $ fromEnum X86RegDx
     poke (plusPtr ptr 12) (0x31507264 :: Int32)
     poke (plusPtr ptr 16) (0x3df1507264 :: Int64)
     peek (castPtr ptr) <* free ptr
@@ -44,11 +47,11 @@ x86OpMemStructSpec = describe "Storable X86OpMemStruct" $ do
 getCsX86Op :: IO CsX86Op
 getCsX86Op = do
     ptr <- mallocArray (sizeOf csX86Op) :: IO (Ptr Word8)
-    poke (castPtr ptr) (fromIntegral $ fromEnum X86OpImm :: Int32)
+    poke (castPtr ptr) $ fromEnum X86OpImm
     poke (plusPtr ptr 8) (0x0123456789abcdef :: Int64)
     poke (plusPtr ptr 32) (2 :: Word8)
     poke (plusPtr ptr 33) (0 :: Word8)
-    poke (plusPtr ptr 36) (fromIntegral $ fromEnum X86AvxBcast4 :: Int32)
+    poke (plusPtr ptr 36) $ fromEnum X86AvxBcast4
     poke (plusPtr ptr 40) (1 :: Word8)
     peek (castPtr ptr) <* free ptr
 
@@ -76,14 +79,14 @@ getCsX86 = do
                    , 0 -- sib
                    ] :: [Word8])
     poke (plusPtr ptr 16) (0x01234567 :: Int64) -- disp
-    poke (plusPtr ptr 24) (fromIntegral $ fromEnum X86RegAl :: Word32)
+    poke (plusPtr ptr 24) $ fromEnum X86RegAl
     poke (plusPtr ptr 28) (2 :: Int8) -- sibScale
-    poke (plusPtr ptr 32) (fromIntegral $ fromEnum X86RegEdx :: Word32)
-    poke (plusPtr ptr 36) (fromIntegral $ fromEnum X86XopCcEq :: Word32)
-    poke (plusPtr ptr 40) (fromIntegral $ fromEnum X86SseCcEq :: Word32)
-    poke (plusPtr ptr 44) (fromIntegral $ fromEnum X86AvxCcEq :: Word32)
+    poke (plusPtr ptr 32) $ fromEnum X86RegEdx
+    poke (plusPtr ptr 36) $ fromEnum X86XopCcEq
+    poke (plusPtr ptr 40) $ fromEnum X86SseCcEq
+    poke (plusPtr ptr 44) $ fromEnum X86AvxCcEq
     poke (plusPtr ptr 48) (1 :: Word8) -- avxSae
-    poke (plusPtr ptr 52) (fromIntegral $ fromEnum X86AvxRmRu :: Word32)
+    poke (plusPtr ptr 52) $ fromEnum X86AvxRmRu
     poke (plusPtr ptr 56) (0xDEADBEEF :: Word64) -- flags
     poke (plusPtr ptr 64) (1 :: Word8) -- op_count
     poke (plusPtr ptr 72) csX86Op
@@ -106,3 +109,53 @@ csX86Spec = describe "Storable CsX86" $ do
         \s@CsX86{} ->
             alloca (\p -> poke p s >> peek p) `shouldReturn` s
     it "parses correctly" $ getCsX86 `shouldReturn` csX86
+
+pushRBP = [0x55]
+readRBP = CsX86Op {
+    value = Reg X86RegRbp,
+    size = 8,
+    access = 1, -- READ
+    avxBcast = X86AvxBcastInvalid,
+    avxZeroOpmask = False
+}
+pushX86 = CsX86 {
+    prefix = (Nothing, Nothing, Nothing, Nothing),
+    opcode = pushRBP,
+    rex = 0,
+    addrSize = 8,
+    modRM = 0,
+    sib = Nothing,
+    disp = Nothing, -- Is this right?
+    sibIndex = X86RegInvalid, -- Scale is 0, What if this is supposed to be X86RegRbp?
+    sibScale = 0,
+    sibBase = X86RegInvalid,
+    xopCc = X86XopCcInvalid,
+    sseCc = X86SseCcInvalid,
+    avxCc = X86AvxCcInvalid,
+    avxSae = False, -- Should this be true?
+    avxRm = X86AvxRmInvalid,
+    flags = 0,
+    operands = [readRBP],
+    encoding = CsX86Encoding 0 0 0 0 0
+}
+pushDetail = CsDetail {
+    regsRead = [fromIntegral $ fromEnum X86RegRsp],
+    regsWrite = [fromIntegral $ fromEnum X86RegRsp],
+    groups = [145],
+    archInfo = Just $ X86 pushX86
+}
+pushInsn = Right [CsInsn {
+    insnId = 0x24c, -- the internal ID of push
+    address = 0x1000,
+    bytes = pushRBP,
+    mnemonic = "push",
+    opStr = "rbp",
+    Hapstone.Internal.Capstone.detail = Just pushDetail
+}]
+
+pushDis = Disassembler CsArchX86 [CsMode64] pushRBP 0x1000 1 True Nothing defaultAction
+
+x86DisasmSpec :: Spec
+x86DisasmSpec = describe "X86-64 Disasm" $ do
+    it "disassembles `push rbp' correctly" $
+        disasmSimpleIO pushDis `shouldReturn` pushInsn

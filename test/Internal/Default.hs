@@ -65,4 +65,4 @@ instance Arbitrary CsInsn where
     arbitrary = CsInsn <$> arbitrary <*> arbitrary <*>
         (take 16 <$> arbitrary) <*>
         (take 31 <$> listOf (chr <$> elements [1..255])) <*>
-        (take 159 <$> listOf(chr <$> elements [1..255])) <*> pure Nothing
+        (take 159 <$> listOf (chr <$> elements [1..255])) <*> pure Nothing

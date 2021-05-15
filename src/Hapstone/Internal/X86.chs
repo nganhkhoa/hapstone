@@ -278,7 +278,7 @@ data CsX86 = CsX86
     , avxCc :: X86AvxCc -- ^ AVX condition code
     , avxSae :: Bool -- ^ AXV Supress all Exception
     , avxRm :: X86AvxRm -- ^ AVX static rounding mode
-    , flags :: Word64 -- ^ flags updated by this instruction
+    , flags :: Word64 -- ^ flags updated by this instruction (a union of two different flag regs in C)
     , operands :: [CsX86Op] -- ^ operand list for this instruction, *MUST*
                             -- have <= 8 elements, else you'll get a runtime
                             -- error when you (implicitly) try to write it to
